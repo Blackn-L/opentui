@@ -42,7 +42,7 @@ export function createRoot(renderer: CliRenderer): Root {
 
   return {
     render: (node: ReactNode) => {
-      engine.attach(renderer)
+      if (!renderer.isDestroyed) engine.attach(renderer)
 
       const element = React.createElement(
         AppContext.Provider,
