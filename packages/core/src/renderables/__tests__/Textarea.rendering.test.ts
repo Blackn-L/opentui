@@ -456,7 +456,7 @@ describe("Textarea - Rendering Tests", () => {
     })
 
     it("should clear highlights with clear() method", async () => {
-      const style = SyntaxStyle.create()
+      const style = SyntaxStyle.create(currentRenderer.nativeScene)
       const styleId = style.registerStyle("highlight", {
         fg: RGBA.fromValues(1, 0, 0, 1),
       })
@@ -486,7 +486,7 @@ describe("Textarea - Rendering Tests", () => {
     })
 
     it("should clear both text and highlights together", async () => {
-      const style = SyntaxStyle.create()
+      const style = SyntaxStyle.create(currentRenderer.nativeScene)
       const styleId = style.registerStyle("highlight", {
         fg: RGBA.fromValues(1, 0, 0, 1),
       })
@@ -553,7 +553,9 @@ describe("Textarea - Rendering Tests", () => {
       editor.focus()
       editor.insertText("x")
 
-      const buffer = OptimizedBuffer.create(80, 24, "wcwidth")
+      const buffer = OptimizedBuffer.create(80, 24, "wcwidth", {
+        owner: currentRenderer.nativeScene,
+      })
       buffer.drawEditorView(editor.editorView, 0, 0)
 
       expect(editor.plainText).toBe("xTest")
@@ -571,7 +573,9 @@ describe("Textarea - Rendering Tests", () => {
 
       editor.focus()
 
-      const buffer = OptimizedBuffer.create(80, 24, "wcwidth")
+      const buffer = OptimizedBuffer.create(80, 24, "wcwidth", {
+        owner: currentRenderer.nativeScene,
+      })
 
       for (let i = 0; i < 5; i++) {
         editor.insertText("a")
@@ -594,7 +598,9 @@ describe("Textarea - Rendering Tests", () => {
       editor.focus()
       editor.gotoLine(9999)
 
-      const buffer = OptimizedBuffer.create(80, 24, "wcwidth")
+      const buffer = OptimizedBuffer.create(80, 24, "wcwidth", {
+        owner: currentRenderer.nativeScene,
+      })
 
       editor.newLine()
       buffer.drawEditorView(editor.editorView, 0, 0)
@@ -616,7 +622,9 @@ describe("Textarea - Rendering Tests", () => {
       editor.focus()
       editor.gotoLine(9999)
 
-      const buffer = OptimizedBuffer.create(80, 24, "wcwidth")
+      const buffer = OptimizedBuffer.create(80, 24, "wcwidth", {
+        owner: currentRenderer.nativeScene,
+      })
 
       editor.deleteCharBackward()
       buffer.drawEditorView(editor.editorView, 0, 0)
@@ -636,7 +644,9 @@ describe("Textarea - Rendering Tests", () => {
 
       editor.focus()
 
-      const buffer = OptimizedBuffer.create(80, 24, "wcwidth")
+      const buffer = OptimizedBuffer.create(80, 24, "wcwidth", {
+        owner: currentRenderer.nativeScene,
+      })
 
       buffer.drawEditorView(editor.editorView, 0, 0)
       editor.insertText("x")
@@ -657,7 +667,9 @@ describe("Textarea - Rendering Tests", () => {
 
       editor.focus()
 
-      const buffer = OptimizedBuffer.create(80, 24, "wcwidth")
+      const buffer = OptimizedBuffer.create(80, 24, "wcwidth", {
+        owner: currentRenderer.nativeScene,
+      })
 
       buffer.drawEditorView(editor.editorView, 0, 0)
 
@@ -1104,20 +1116,43 @@ describe("Textarea - Rendering Tests", () => {
       expect(editor.plainText).toBe("")
     })
 
-    it("redraws all Unicode placeholder characters after word boundaries change", async () => {
-      const { textarea: editor } = await createTextareaRenderable(currentRenderer, renderOnce, {
-        width: 70,
-        height: 4,
-        wrapMode: "word",
-        placeholder: "Worker running, Esc to stop...",
-      })
-      expect(captureFrame().split("\n")[0].trimEnd()).toBe("Worker running, Esc to stop...")
+    it.each([
+      [6, "alpha beta", "a bbbbbbbb", "a\nbbbbbb\nbb"],
+      [
+        12,
+        "Worker running, Esc to stop...",
+        "Edit \u{1f680} text, / show help...",
+        "Edit \u{1f680}\ntext, / show\nhelp...",
+      ],
+      [
+        70,
+        "Worker running, Esc to stop...",
+        "Edit \u{1f680} text, / show help...",
+        "Edit \u{1f680} text, / show help...",
+      ],
+    ] as const)(
+      "redraws %i-column placeholders after word boundaries change",
+      async (width, before, after, expected) => {
+        const { textarea: editor } = await createTextareaRenderable(currentRenderer, renderOnce, {
+          width,
+          height: 4,
+          wrapMode: "word",
+          placeholder: before,
+        })
+        expect(captureFrame()).toContain(before.split(" ")[0])
 
-      editor.placeholder = "Edit \u{1f680} text, / show help..."
-      await renderOnce()
-      expect(captureFrame().split("\n")[0].trimEnd()).toBe("Edit \u{1f680} text, / show help...")
-      expect(editor.plainText).toBe("")
-    })
+        editor.placeholder = after
+        await renderOnce()
+        expect(
+          captureFrame()
+            .split("\n")
+            .map((line) => line.trimEnd())
+            .join("\n")
+            .trimEnd(),
+        ).toBe(expected)
+        expect(editor.plainText).toBe("")
+      },
+    )
 
     it("should update placeholder text dynamically", async () => {
       const { textarea: editor } = await createTextareaRenderable(currentRenderer, renderOnce, {
